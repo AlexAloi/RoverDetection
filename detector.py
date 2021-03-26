@@ -18,7 +18,7 @@ class Detector():
     def letterDetect(self, img):
         orig = img.copy()
         (H, W) = img.shape[:2]
-        (newW, newH) = (args["width"], args["height"])
+        (newW, newH) = (320, 320)
         rW = W / float(newW)
         rH = H / float(newH)
         img = cv2.resize(img, (newW, newH))
@@ -28,7 +28,7 @@ class Detector():
             "feature_fusion/Conv_7/Sigmoid",
             "feature_fusion/concat_3"]
         net = cv2.dnn.readNet("frozen_east_text_detection.pb")
-        blob = cv2.dnn.blobFromimg(img, 1.0, (W, H),(123.68, 116.78, 103.94), swapRB=True, crop=False)
+        blob = cv2.dnn.blobFromImage(img, 1.0, (W, H),(123.68, 116.78, 103.94), swapRB=True, crop=False)
         net.setInput(blob)
         (scores, geometry) = net.forward(layerNames)
         (numRows, numCols) = scores.shape[2:4]
@@ -43,7 +43,7 @@ class Detector():
             xData3 = geometry[0, 3, y]
             anglesData = geometry[0, 4, y]
             for x in range(0, numCols):
-                if scoresData[x] < args["min_confidence"]:
+                if scoresData[x] < 0.5:
                     continue
                 (offsetX, offsetY) = (x * 4.0, y * 4.0)
                 angle = anglesData[x]
@@ -70,13 +70,19 @@ class Detector():
         boxes = []
         for contour in contours:
             approx = cv2.approxPolyDP(contour, 0.01* cv2.arcLength(contour, True), True)
-            x = approx.ravel()[0]
-            y = approx.ravel()[1] - 5
             if len(approx) == 4 :
                 x, y , w, h = cv2.boundingRect(approx)
                 aspectRatio = float(w)/h
                 print(aspectRatio)
                 if aspectRatio <= 0.95 or aspectRatio >= 1.05:
                     cv2.rectangle(img,(x,y),(x+w,y+h),(0,255,0),3)
-                    boxes.append([x,y,x+w,y+h])
+                    mask = np.zeros(img.shape[:2], np.uint8)
+                    cv2.drawContours(mask, [contour], -1, 255, -1)
+                    mean = np.round(cv2.mean(image, mask=mask),2)
+                    boxes.append([x,y,x+w,y+h,mean])
         return boxes
+
+if __name__ == "__main__":
+    image = cv2.imread("Capture.jpg")
+    detector = Detector()
+    print(detector.colourDetect(image))
